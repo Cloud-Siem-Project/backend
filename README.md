@@ -1,178 +1,219 @@
-# Cloud SIEM Platform Backend
+# 🚀 Cloud SIEM Platform Backend
 
-Bu proje, Cloud Security Information and Event Management (SIEM) sisteminin prototipini geliştirmeyi amaçlayan bir backend platformudur.
+Bu proje, **Cloud Security Information and Event Management (SIEM)** sisteminin prototipini geliştirmeyi amaçlayan bir backend platformudur.
 
-Sistem farklı makinelerden gelen logları toplar, bu logları analiz eder, şüpheli aktiviteleri tespit eder ve güvenlik ekiplerinin inceleyebilmesi için alert ve incident kayıtları oluşturur.
+Sistem farklı makinelerden gelen logları toplar, bu logları analiz eder, şüpheli aktiviteleri tespit eder ve güvenlik ekiplerinin inceleyebilmesi için **alert** ve **incident** kayıtları oluşturur.
 
-#Projenin Amacı
+---
+
+## 🎯 Projenin Amacı
 
 Bu platformun amacı aşağıdaki güvenlik izleme süreçlerini gerçekleştirebilen bir sistem geliştirmektir:
 
-Dağıtık makinelerden log toplamak
+* Dağıtık makinelerden log toplamak
+* Farklı log formatlarını standart hale getirmek
+* Güvenlik olaylarını analiz etmek
+* Şüpheli aktiviteleri tespit etmek
+* Alert üretmek
+* Incident yönetimi sağlamak
+* Güvenlik dashboardları için veri sunmak
 
-Farklı log formatlarını standart hale getirmek
+---
 
-Güvenlik olaylarını analiz etmek
+## 🏗️ System Architecture
 
-Şüpheli aktiviteleri tespit etmek
+Bu platform **distributed architecture** kullanır:
 
-Alert üretmek
+```text
++-------------------+
+|   Worker Agent    |
+| (Log Collector)   |
++-------------------+
+          │
+          │ Logs / Heartbeat
+          ▼
++-------------------+
+|    Master Node    |
+| Node Management   |
++-------------------+
+          │
+          ▼
++-------------------+
+|    Backend API    |
+|  Event Pipeline   |
++-------------------+
+          │
+          ▼
++-------------------+
+| Detection Engine  |
++-------------------+
+          │
+          ▼
++-------------------+
+|   Alert System    |
++-------------------+
+          │
+          ▼
++-------------------+
+| Incident Manager  |
++-------------------+
+          │
+          ▼
++-------------------+
+|   Dashboard API   |
++-------------------+
+```
 
-Incident yönetimi sağlamak
+---
 
-Güvenlik dashboardları için veri sunmak
+## ⚙️ Ana Sistem Bileşenleri
 
-#System Architecture
+### 🤖 Worker Agent
 
-Bu platform distributed architecture kullanır.
+İzlenen makinelerde çalışan bir programdır.
 
-        +-------------------+
-        |   Worker Agent    |
-        | (Log Collector)   |
-        +-------------------+
-                  │
-                  │ Logs / Heartbeat
-                  ▼
-        +-------------------+
-        |    Master Node    |
-        | Node Management   |
-        +-------------------+
-                  │
-                  ▼
-        +-------------------+
-        |    Backend API    |
-        |  Event Pipeline   |
-        +-------------------+
-                  │
-                  ▼
-        +-------------------+
-        | Detection Engine  |
-        +-------------------+
-                  │
-                  ▼
-        +-------------------+
-        |   Alert System    |
-        +-------------------+
-                  │
-                  ▼
-        +-------------------+
-        | Incident Manager  |
-        +-------------------+
-                  │
-                  ▼
-        +-------------------+
-        |   Dashboard API   |
-        +-------------------+
+**Görevleri:**
 
-#Ana Sistem Bileşenleri
+* Sistem bilgilerini toplamak
+* Açık portları tespit etmek
+* Logları toplamak
+* Master sunucuya heartbeat göndermek
+* Logları merkezi sisteme iletmek
+* Register işlemi yapmak
 
-Worker Agent : İzlenen makinelerde çalışan bir programdır.
-Görevleri: Sistem bilgilerini toplamak, Açık portları tespit etmek, Logları toplamak, Master sunucuya heartbeat göndermek, Logları merkezi sisteme iletmek, Her worker sisteme bağlanırken register işlemi yapar.
+---
 
-Master Server : Worker node'ları yönetir.
-Görevleri: Worker kayıtlarını almak, Node health durumunu izlemek, Heartbeat kontrolü yapmak, Cluster durumunu göstermek
+### 🧠 Master Server
 
-Backend API : Sistemin merkezidir.
-Görevleri: Worker'lardan gelen logları almak, Raw logları saklamak, Event üretmek, Detection kurallarını çalıştırmak, Alert üretmek, Incident yönetmek, Dashboard verisi sağlamak
-Backend FastAPI kullanılarak geliştirilmektedir.
+Worker node'ları yönetir.
 
-###Event Processing Pipeline
-Gelen loglar birden fazla işlem aşamasından geçer.
+**Görevleri:**
 
-#Raw Log Storage -> Worker'lardan gelen loglar önce ham şekilde saklanır. Bu sayede:
-yeniden işleme yapılabilir, hata ayıklama kolaylaşır, audit log tutulur
+* Worker kayıtlarını almak
+* Node health durumunu izlemek
+* Heartbeat kontrolü yapmak
+* Cluster durumunu göstermek
 
-#Normalization
+---
+
+### 🔥 Backend API
+
+Sistemin merkezidir.
+
+**Görevleri:**
+
+* Worker'lardan gelen logları almak
+* Raw logları saklamak
+* Event üretmek
+* Detection kurallarını çalıştırmak
+* Alert üretmek
+* Incident yönetmek
+* Dashboard verisi sağlamak
+
+Backend **FastAPI** kullanılarak geliştirilmektedir.
+
+---
+
+## 🔄 Event Processing Pipeline
+
+### 📦 Raw Log Storage
+
+Worker'lardan gelen loglar önce ham şekilde saklanır.
+
+Bu sayede:
+
+* yeniden işleme yapılabilir
+* hata ayıklama kolaylaşır
+* audit log tutulur
+
+---
+
+### 🔄 Normalization
+
 Farklı log formatları tek bir standart event yapısına çevrilir.
-Örnek event alanları:
-timestamp
-source
-event_type
-severity
-username
-ip_address
-action
 
-#Filtering
+**Örnek event alanları:**
+
+* timestamp
+* source
+* event_type
+* severity
+* username
+* ip_address
+* action
+
+---
+
+### 🧹 Filtering
+
 Gürültü oluşturan ve gereksiz loglar filtrelenir.
-Bu sayede detection kalitesi artar.
 
-#Enrichment
+---
+
+### ➕ Enrichment
+
 Event'lere ek bağlam bilgisi eklenir.
 
-Örnek:
-node bilgisi
-kullanıcı bilgisi
-kaynak türü
-Detection Engine
-Detection motoru event'leri analiz eder ve şüpheli davranışları tespit eder.
+**Örnek:**
 
-#Alert Sistemi
+* node bilgisi
+* kullanıcı bilgisi
+* kaynak türü
+
+---
+
+### 🧠 Detection Engine
+
+Event'leri analiz eder ve şüpheli davranışları tespit eder.
+
+---
+
+### 🚨 Alert Sistemi
+
 Şüpheli aktiviteler tespit edildiğinde sistem alert üretir.
-Alert bilgileri:
-severity
-açıklama
-ilgili eventler
-kaynak node
 
-Alert lifecycle:
+**Alert bilgileri:**
+
+* severity
+* açıklama
+* ilgili eventler
+* kaynak node
+
+**Alert lifecycle:**
+
+```
 Open → Acknowledged → Resolved
+```
 
-#Incident Yönetimi
+---
+
+### 🧩 Incident Yönetimi
+
 Alert'ler güvenlik ekipleri tarafından incident olarak ele alınabilir.
-Incident sistemi:
-incident oluşturma
-incident atama
-inceleme notları
-durum güncelleme
-incident kapatma
 
-#Proje Repo Yapısı
+**Incident sistemi:**
 
+* incident oluşturma
+* incident atama
+* inceleme notları
+* durum güncelleme
+* incident kapatma
+
+---
+
+## 📁 Proje Repo Yapısı
+
+```bash
 cloud-siem-project/
 ├── app/
 │   ├── controllers/
-│   │   ├── auth_controller.py
-│   │   ├── event_controller.py
-│   │   ├── alert_controller.py
-│   │   └── incident_controller.py
-│   │
 │   ├── routes/
-│   │   ├── auth_routes.py
-│   │   ├── event_routes.py
-│   │   ├── alert_routes.py
-│   │   └── incident_routes.py
-│   │
 │   ├── models/
-│   │   ├── user_model.py
-│   │   ├── event_model.py
-│   │   ├── alert_model.py
-│   │   └── incident_model.py
-│   │
 │   ├── services/
-│   │   ├── auth_service.py
-│   │   ├── event_service.py
-│   │   ├── alert_service.py
-│   │   └── incident_service.py
-│   │
 │   ├── schemas/
-│   │   ├── auth_schema.py
-│   │   ├── event_schema.py
-│   │   ├── alert_schema.py
-│   │   └── incident_schema.py
-│   │
 │   ├── helpers/
-│   │   └── response_helper.py
-│   │
 │   ├── config/
-│   │   ├── app_config.py
-│   │   ├── database.py
-│   │   └── constants.py
-│   │
 │   ├── db/
-│   │   ├── base.py
-│   │   └── session.py
-│   │
 │   └── main.py
 │
 ├── agents/
@@ -184,61 +225,115 @@ cloud-siem-project/
 │   └── run_api.py
 │
 ├── tests/
-│   └── __init__.py
 │
 ├── requirements.txt
 ├── .env.example
 ├── README.md
 └── run.py
+```
 
-#Kullanılan Teknolojiler
+---
 
-Backend: Python, FastAPI
-Database: PostgreSQL
-ORM: SQLAlchemy
-Architecture: Distributed (Worker + Master)
+## 🧰 Kullanılan Teknolojiler
 
-#Kurulum ve Çalıştırma
+* **Backend:** Python, FastAPI
+* **Database:** PostgreSQL
+* **ORM:** SQLAlchemy
+* **Architecture:** Distributed (Worker + Master)
 
-1️⃣ PostgreSQL Kurulumu
-**Mac (Homebrew)
+---
+
+## ⚙️ Kurulum ve Çalıştırma
+
+### 1️⃣ PostgreSQL Kurulumu
+
+#### Mac (Homebrew)
+
+```bash
 brew install postgresql
 brew services start postgresql
-**Windows
-PostgreSQL indir:
-https://www.postgresql.org/download/windows/
+```
+
+#### Windows
+
+👉 https://www.postgresql.org/download/windows/
+
 Kurulum sırasında:
-şifre belirle
-port: 5432 bırak
-**Linux (Ubuntu)
+
+* şifre belirle
+* port: 5432 bırak
+
+#### Linux (Ubuntu)
+
+```bash
 sudo apt update
 sudo apt install postgresql postgresql-contrib
 sudo service postgresql start
+```
 
-2️⃣ Database oluştur
+---
+
+### 2️⃣ Database oluştur
+
+```bash
 psql postgres
 CREATE DATABASE cloudsiem;
 \q
+```
 
-3️⃣ Kullanıcı ve şifre ayarla
+---
+
+### 3️⃣ Kullanıcı ve şifre ayarla
+
+```sql
 ALTER USER YOUR_USERNAME PASSWORD 'your_password';
+```
 
-4️⃣ .env dosyasını oluştur
+---
+
+### 4️⃣ .env dosyası oluştur
+
+```env
 DATABASE_URL=postgresql+psycopg2://username:password@localhost:5432/cloudsiem
+```
 
-5️⃣ Bağımlılıkları yükle
+---
+
+### 5️⃣ Bağımlılıkları yükle
+
+```bash
 pip install -r requirements.txt
+```
 
-6️⃣ Backend’i başlat
+---
+
+### 6️⃣ Backend’i başlat
+
+```bash
 uvicorn app.main:app --reload
+```
 
-7️⃣ Swagger
-http://localhost:8000/docs
+---
 
-🤖 Worker Çalıştırma
+### 7️⃣ Swagger
+
+👉 http://localhost:8000/docs
+
+---
+
+## 🤖 Worker Çalıştırma
+
+```bash
 python agents/worker.py --master http://127.0.0.1:9800
+```
 
-🧪 Bağlantı Testi
+---
+
+## 🧪 Bağlantı Testi
+
+```bash
 psql -U username -d cloudsiem -W
+```
 
-Bağlanabiliyorsanız kurulum başarılıdır.
+Bağlanabiliyorsanız kurulum başarılıdır ✅
+
