@@ -1,4 +1,4 @@
-# 🚀 Cloud SIEM Platform Backend
+# Cloud SIEM Platform Backend
 
 Bu proje, **Cloud Security Information and Event Management (SIEM)** sisteminin prototipini geliştirmeyi amaçlayan bir backend platformudur.
 
@@ -6,7 +6,7 @@ Sistem farklı makinelerden gelen logları toplar, bu logları analiz eder, şü
 
 ---
 
-## 🎯 Projenin Amacı
+## Projenin Amacı
 
 Bu platformun amacı aşağıdaki güvenlik izleme süreçlerini gerçekleştirebilen bir sistem geliştirmektir:
 
@@ -20,7 +20,7 @@ Bu platformun amacı aşağıdaki güvenlik izleme süreçlerini gerçekleştire
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 Bu platform **distributed architecture** kullanır:
 
@@ -66,9 +66,9 @@ Bu platform **distributed architecture** kullanır:
 
 ---
 
-## ⚙️ Ana Sistem Bileşenleri
+## Ana Sistem Bileşenleri
 
-### 🤖 Worker Agent
+### Worker Agent
 
 İzlenen makinelerde çalışan bir programdır.
 
@@ -83,7 +83,7 @@ Bu platform **distributed architecture** kullanır:
 
 ---
 
-### 🧠 Master Server
+### Master Server
 
 Worker node'ları yönetir.
 
@@ -96,7 +96,7 @@ Worker node'ları yönetir.
 
 ---
 
-### 🔥 Backend API
+### Backend API
 
 Sistemin merkezidir.
 
@@ -114,9 +114,9 @@ Backend **FastAPI** kullanılarak geliştirilmektedir.
 
 ---
 
-## 🔄 Event Processing Pipeline
+## Event Processing Pipeline
 
-### 📦 Raw Log Storage
+### Raw Log Storage
 
 Worker'lardan gelen loglar önce ham şekilde saklanır.
 
@@ -128,7 +128,7 @@ Bu sayede:
 
 ---
 
-### 🔄 Normalization
+### Normalization
 
 Farklı log formatları tek bir standart event yapısına çevrilir.
 
@@ -144,13 +144,13 @@ Farklı log formatları tek bir standart event yapısına çevrilir.
 
 ---
 
-### 🧹 Filtering
+### Filtering
 
 Gürültü oluşturan ve gereksiz loglar filtrelenir.
 
 ---
 
-### ➕ Enrichment
+### Enrichment
 
 Event'lere ek bağlam bilgisi eklenir.
 
@@ -162,13 +162,13 @@ Event'lere ek bağlam bilgisi eklenir.
 
 ---
 
-### 🧠 Detection Engine
+### Detection Engine
 
 Event'leri analiz eder ve şüpheli davranışları tespit eder.
 
 ---
 
-### 🚨 Alert Sistemi
+### Alert Sistemi
 
 Şüpheli aktiviteler tespit edildiğinde sistem alert üretir.
 
@@ -187,7 +187,7 @@ Open → Acknowledged → Resolved
 
 ---
 
-### 🧩 Incident Yönetimi
+### Incident Yönetimi
 
 Alert'ler güvenlik ekipleri tarafından incident olarak ele alınabilir.
 
@@ -201,7 +201,7 @@ Alert'ler güvenlik ekipleri tarafından incident olarak ele alınabilir.
 
 ---
 
-## 📁 Proje Repo Yapısı
+## Proje Repo Yapısı
 
 ```bash
 cloud-siem-project/
@@ -234,7 +234,7 @@ cloud-siem-project/
 
 ---
 
-## 🧰 Kullanılan Teknolojiler
+## Kullanılan Teknolojiler
 
 * **Backend:** Python, FastAPI
 * **Database:** PostgreSQL
@@ -243,7 +243,7 @@ cloud-siem-project/
 
 ---
 
-## ⚙️ Kurulum ve Çalıştırma
+## Kurulum ve Çalıştırma
 
 ### 1️⃣ PostgreSQL Kurulumu
 
