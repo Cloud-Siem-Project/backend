@@ -59,6 +59,19 @@ class MasterAPIHandler(BaseHTTPRequestHandler):
         """Suppress default HTTP logs to keep the CLI clean."""
         pass
 
+    # ── CORS ──────────────────────────────────────────────────────────────
+
+    def _add_cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def do_OPTIONS(self):
+        """Handle CORS preflight requests."""
+        self.send_response(204)
+        self._add_cors_headers()
+        self.end_headers()
+
     # ── routing ───────────────────────────────────────────────────────────
 
     def do_POST(self):
@@ -156,6 +169,7 @@ class MasterAPIHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self._add_cors_headers()
         self.end_headers()
         self.wfile.write(body)
 
