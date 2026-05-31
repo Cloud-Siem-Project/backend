@@ -9,6 +9,8 @@ Usage:
     python3 master.py [--host 0.0.0.0] [--port 9800]
 """
 
+from __future__ import annotations  # lazy annotations — keeps PEP 604 syntax (`dict | None`) parseable on Python 3.9 (AL2023 default).
+
 import argparse
 import cmd
 import json
@@ -318,17 +320,34 @@ def main():
     parser = argparse.ArgumentParser(description="CloudSIEM Master Server")
     parser.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=9800, help="API listen port (default: 9800)")
+    parser.add_argument("--api-only", action="store_true",
+                        help="Run HTTP API only without the interactive CLI "
+                             "(use for containers, systemd services, EC2 user-data).")
     args = parser.parse_args()
 
     # start HTTP API in background
     server = HTTPServer((args.host, args.port), MasterAPIHandler)
     api_thread = threading.Thread(target=server.serve_forever, daemon=True)
     api_thread.start()
-    print(f"  API listening on {args.host}:{args.port}")
+    print(f"  API listening on {args.host}:{args.port}", flush=True)
 
     # start health checker in background
     hc_thread = threading.Thread(target=health_checker, daemon=True)
     hc_thread.start()
+
+    # API-only mode: no interactive shell, just block until killed.
+    # This is the path used by the EC2 systemd unit.
+    if args.api_only:
+        print("  Running in --api-only mode (no CLI). Send SIGTERM to stop.", flush=True)
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.shutdown()
+            print("  Master stopped.")
+        return
 
     # run interactive CLI on main thread
     global _cli_ref

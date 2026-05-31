@@ -1,0 +1,42 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "master.py"
+      - "worker.py"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-central-1
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload master.py to S3
+        run: aws s3 cp master.py "s3://${{ vars.S3_CODE_BUCKET }}/master.py"
+
+      - name: Restart service via SSM
+        run: |
+          aws ssm send-command \
+            --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["aws s3 cp s3://'"${{ vars.S3_CODE_BUCKET }}"'/master.py /opt/cloudsiem/master.py","systemctl restart cloudsiem-master"]' \
+            --comment "CI/CD deploy ${{ github.sha }}" \
+            --output text \
+            --query "Command.CommandId"

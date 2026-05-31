@@ -9,6 +9,8 @@ Usage:
     python3 worker.py --master http://10.0.0.1:9800 [--node-id mynode01] [--interval 20]
 """
 
+from __future__ import annotations  # lazy annotations — keeps PEP 604 (`dict | None`) compatible with older python.
+
 import argparse
 import json
 import os
