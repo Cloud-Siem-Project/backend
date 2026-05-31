@@ -14,7 +14,9 @@ from __future__ import annotations  # lazy annotations — keeps PEP 604 syntax 
 import argparse
 import cmd
 import json
+import os
 import signal
+import sqlite3
 import sys
 import threading
 import time
@@ -28,6 +30,80 @@ nodes_lock = threading.Lock()
 
 HEALTH_INTERVAL = 30               # seconds between health sweeps
 HEARTBEAT_TIMEOUT = 45             # mark DOWN after this many seconds w/o heartbeat
+
+DB_PATH = os.environ.get("CLOUDSIEM_DB", "/opt/cloudsiem/master.db")
+
+# ─── Database ────────────────────────────────────────────────────────────────
+
+def _db_connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH, timeout=5)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS nodes (
+            node_id         TEXT PRIMARY KEY,
+            hostname        TEXT NOT NULL DEFAULT 'unknown',
+            ip              TEXT NOT NULL DEFAULT 'unknown',
+            kernel          TEXT NOT NULL DEFAULT 'unknown',
+            ports           TEXT NOT NULL DEFAULT '[]',
+            status          TEXT NOT NULL DEFAULT 'UP',
+            registered_at   TEXT NOT NULL,
+            last_heartbeat  REAL NOT NULL,
+            worker_version  TEXT NOT NULL DEFAULT 'unknown'
+        )
+    """)
+    conn.commit()
+    return conn
+
+def _db_load_nodes():
+    conn = _db_connect()
+    cursor = conn.execute("SELECT node_id, hostname, ip, kernel, ports, status, registered_at, last_heartbeat, worker_version FROM nodes")
+    for row in cursor:
+        nodes[row[0]] = {
+            "node_id": row[0],
+            "hostname": row[1],
+            "ip": row[2],
+            "kernel": row[3],
+            "ports": json.loads(row[4]),
+            "status": row[5],
+            "registered_at": row[6],
+            "last_heartbeat": row[7],
+            "worker_version": row[8],
+        }
+    conn.close()
+
+def _db_upsert_node(rec: dict):
+    conn = _db_connect()
+    conn.execute("""
+        INSERT INTO nodes (node_id, hostname, ip, kernel, ports, status, registered_at, last_heartbeat, worker_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(node_id) DO UPDATE SET
+            hostname=excluded.hostname,
+            ip=excluded.ip,
+            kernel=excluded.kernel,
+            ports=excluded.ports,
+            status=excluded.status,
+            registered_at=excluded.registered_at,
+            last_heartbeat=excluded.last_heartbeat,
+            worker_version=excluded.worker_version
+    """, (
+        rec["node_id"], rec["hostname"], rec["ip"], rec["kernel"],
+        json.dumps(rec["ports"]), rec["status"], rec["registered_at"],
+        rec["last_heartbeat"], rec["worker_version"],
+    ))
+    conn.commit()
+    conn.close()
+
+def _db_update_status(node_id: str, status: str):
+    conn = _db_connect()
+    conn.execute("UPDATE nodes SET status = ? WHERE node_id = ?", (status, node_id))
+    conn.commit()
+    conn.close()
+
+def _db_delete_node(node_id: str):
+    conn = _db_connect()
+    conn.execute("DELETE FROM nodes WHERE node_id = ?", (node_id,))
+    conn.commit()
+    conn.close()
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -115,6 +191,7 @@ class MasterAPIHandler(BaseHTTPRequestHandler):
                 "last_heartbeat":   now_ts(),
                 "worker_version":   body.get("worker_version", "unknown"),
             }
+            _db_upsert_node(nodes[node_id])
 
         action = "re-registered" if already else "registered"
         _cli_event(f"[+] Node '{node_id}' ({body.get('ip','?')}) {action}")
@@ -144,6 +221,7 @@ class MasterAPIHandler(BaseHTTPRequestHandler):
                 "kernel":         body.get("kernel", nodes[node_id]["kernel"]),
                 "ports":          body.get("ports", nodes[node_id]["ports"]),
             })
+            _db_upsert_node(nodes[node_id])
 
         if was_down:
             _cli_event(f"[↑] Node '{node_id}' came back UP")
@@ -187,6 +265,7 @@ def health_checker():
             for nid, rec in nodes.items():
                 if rec["status"] == "UP" and rec["last_heartbeat"] < cutoff:
                     rec["status"] = "DOWN"
+                    _db_update_status(nid, "DOWN")
                     _cli_event(f"[✗] Node '{nid}' marked DOWN (no heartbeat for >{HEARTBEAT_TIMEOUT}s)")
 
 
@@ -290,6 +369,7 @@ class MasterCLI(cmd.Cmd):
         with nodes_lock:
             if node_id in nodes:
                 del nodes[node_id]
+                _db_delete_node(node_id)
                 print(f"  Node '{node_id}' removed.")
             else:
                 print(f"  Node '{node_id}' not found.")
@@ -323,7 +403,22 @@ def main():
     parser.add_argument("--api-only", action="store_true",
                         help="Run HTTP API only without the interactive CLI "
                              "(use for containers, systemd services, EC2 user-data).")
+    parser.add_argument("--db", default=None,
+                        help="Path to SQLite database (default: /opt/cloudsiem/master.db)")
     args = parser.parse_args()
+
+    if args.db:
+        global DB_PATH
+        DB_PATH = args.db
+
+    # ensure db directory exists
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
+    # load persisted nodes
+    _db_load_nodes()
+    loaded = len(nodes)
+    if loaded:
+        print(f"  Loaded {loaded} node(s) from database", flush=True)
 
     # start HTTP API in background
     server = HTTPServer((args.host, args.port), MasterAPIHandler)
