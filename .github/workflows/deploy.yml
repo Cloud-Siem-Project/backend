@@ -46,8 +46,17 @@ jobs:
 
       - name: Restart service via SSM
         run: |
+          # Resolve the master instance by tag so a Terraform replace (new
+          # instance id) doesn't break the deploy. Falls back to the EC2_INSTANCE_ID
+          # var if the lookup finds nothing.
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=cloudguard-dns-staging-backend-instance" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+          if [ -z "$INSTANCE_ID" ]; then INSTANCE_ID="${{ vars.EC2_INSTANCE_ID }}"; fi
+          echo "Target master instance: $INSTANCE_ID"
           aws ssm send-command \
-            --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
+            --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=["aws s3 cp s3://'"${{ vars.S3_CODE_BUCKET }}"'/master.py /opt/cloudsiem/master.py","aws s3 cp s3://'"${{ vars.S3_CODE_BUCKET }}"'/worker.py /opt/cloudsiem/worker.py","systemctl restart cloudsiem-master"]' \
             --comment "CI/CD deploy ${{ github.sha }}" \
