@@ -39,15 +39,17 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Upload master.py to S3
-        run: aws s3 cp master.py "s3://${{ vars.S3_CODE_BUCKET }}/master.py"
+      - name: Upload master.py + worker.py to S3
+        run: |
+          aws s3 cp master.py "s3://${{ vars.S3_CODE_BUCKET }}/master.py"
+          aws s3 cp worker.py "s3://${{ vars.S3_CODE_BUCKET }}/worker.py"
 
       - name: Restart service via SSM
         run: |
           aws ssm send-command \
             --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["aws s3 cp s3://'"${{ vars.S3_CODE_BUCKET }}"'/master.py /opt/cloudsiem/master.py","systemctl restart cloudsiem-master"]' \
+            --parameters 'commands=["aws s3 cp s3://'"${{ vars.S3_CODE_BUCKET }}"'/master.py /opt/cloudsiem/master.py","aws s3 cp s3://'"${{ vars.S3_CODE_BUCKET }}"'/worker.py /opt/cloudsiem/worker.py","systemctl restart cloudsiem-master"]' \
             --comment "CI/CD deploy ${{ github.sha }}" \
             --output text \
             --query "Command.CommandId"
