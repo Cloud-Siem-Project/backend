@@ -22,6 +22,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import unquote
 
 # ─── Cluster State ────────────────────────────────────────────────────────────
 
@@ -128,9 +129,11 @@ def pretty_ago(ts: float) -> str:
 class MasterAPIHandler(BaseHTTPRequestHandler):
     """
     Endpoints:
-        POST /api/register      — worker registers itself
-        POST /api/heartbeat     — worker heartbeat + system info update
-        GET  /api/nodes         — dump cluster state (JSON)
+        POST   /api/register        — worker registers itself
+        POST   /api/heartbeat       — worker heartbeat + system info update
+        GET    /api/nodes           — dump cluster state (JSON)
+        DELETE /api/nodes/<node_id> — deregister (remove) a node
+        GET    /api/worker.py       — serve the worker agent script (for registration)
     """
 
     def log_message(self, format, *args):
@@ -141,7 +144,7 @@ class MasterAPIHandler(BaseHTTPRequestHandler):
 
     def _add_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def do_OPTIONS(self):
@@ -163,6 +166,16 @@ class MasterAPIHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/nodes":
             self._handle_list_nodes()
+        elif self.path == "/api/worker.py" or self.path.startswith("/api/worker.py?"):
+            self._handle_serve_worker()
+        else:
+            self._respond(404, {"error": "not found"})
+
+    def do_DELETE(self):
+        # DELETE /api/nodes/<node_id> — deregister a node
+        if self.path.startswith("/api/nodes/"):
+            node_id = unquote(self.path[len("/api/nodes/"):]).strip("/")
+            self._handle_deregister(node_id)
         else:
             self._respond(404, {"error": "not found"})
 
@@ -232,6 +245,37 @@ class MasterAPIHandler(BaseHTTPRequestHandler):
         with nodes_lock:
             snapshot = dict(nodes)
         self._respond(200, snapshot)
+
+    def _handle_deregister(self, node_id: str):
+        if not node_id:
+            self._respond(400, {"error": "node_id required"})
+            return
+        with nodes_lock:
+            existed = node_id in nodes
+            if existed:
+                del nodes[node_id]
+        _db_delete_node(node_id)
+        if existed:
+            _cli_event(f"[-] Node '{node_id}' deregistered via API")
+            self._respond(200, {"ok": True, "action": "deregistered", "node_id": node_id})
+        else:
+            self._respond(404, {"error": "node not found", "node_id": node_id})
+
+    def _handle_serve_worker(self):
+        """Serve worker.py so a fresh node can bootstrap itself (Wazuh-style)."""
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "worker.py")
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+        except OSError:
+            self._respond(404, {"error": "worker.py not available on master"})
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/x-python; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self._add_cors_headers()
+        self.end_headers()
+        self.wfile.write(data)
 
     # ── plumbing ──────────────────────────────────────────────────────────
 
