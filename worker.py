@@ -23,7 +23,7 @@ import time
 import urllib.request
 import urllib.error
 
-WORKER_VERSION = "0.1.0"
+WORKER_VERSION = "0.2.0"
 
 # ─── System Info Collection ───────────────────────────────────────────────────
 
@@ -135,6 +135,92 @@ def get_exposed_ports() -> list[dict]:
     return sorted(unique, key=lambda x: x["port"])
 
 
+# ─── Resource Metrics (stdlib /proc parsing — no psutil) ──────────────────────
+
+_prev_cpu = None   # (idle, total)
+_prev_net = None   # (rx, tx, ts)
+
+
+def _read_cpu():
+    with open("/proc/stat") as f:
+        parts = [int(x) for x in f.readline().split()[1:]]
+    idle = parts[3] + (parts[4] if len(parts) > 4 else 0)  # idle + iowait
+    return idle, sum(parts)
+
+
+def _read_net():
+    rx = tx = 0
+    with open("/proc/net/dev") as f:
+        for line in f.readlines()[2:]:
+            iface, _, data = line.partition(":")
+            if iface.strip() == "lo":
+                continue
+            cols = data.split()
+            if len(cols) >= 9:
+                rx += int(cols[0])
+                tx += int(cols[8])
+    return rx, tx
+
+
+def get_metrics() -> dict:
+    """CPU%, memory, load, network rate, disk — best-effort, all optional."""
+    global _prev_cpu, _prev_net
+    m = {}
+
+    try:  # CPU% over the interval since the last heartbeat
+        idle, total = _read_cpu()
+        if _prev_cpu and total - _prev_cpu[1] > 0:
+            di = idle - _prev_cpu[0]
+            dt = total - _prev_cpu[1]
+            m["cpu_percent"] = round(100 * (1 - di / dt), 1)
+        _prev_cpu = (idle, total)
+    except Exception:
+        pass
+
+    try:  # memory from /proc/meminfo (kB)
+        info = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, _, v = line.partition(":")
+                info[k] = int(v.split()[0])
+        total = info.get("MemTotal", 0)
+        avail = info.get("MemAvailable", info.get("MemFree", 0))
+        if total:
+            m["mem_total_mb"] = round(total / 1024)
+            m["mem_used_mb"] = round((total - avail) / 1024)
+            m["mem_percent"] = round(100 * (total - avail) / total, 1)
+    except Exception:
+        pass
+
+    try:
+        m["load"] = [round(x, 2) for x in os.getloadavg()]
+    except Exception:
+        pass
+
+    try:  # network throughput (kbit/s) since last heartbeat
+        rx, tx = _read_net()
+        now = time.time()
+        if _prev_net:
+            elapsed = now - _prev_net[2]
+            if elapsed > 0:
+                m["net_rx_kbps"] = round((rx - _prev_net[0]) * 8 / 1000 / elapsed, 1)
+                m["net_tx_kbps"] = round((tx - _prev_net[1]) * 8 / 1000 / elapsed, 1)
+        m["net_rx_bytes"] = rx
+        m["net_tx_bytes"] = tx
+        _prev_net = (rx, tx, now)
+    except Exception:
+        pass
+
+    try:
+        import shutil
+        du = shutil.disk_usage("/")
+        m["disk_percent"] = round(100 * du.used / du.total, 1)
+    except Exception:
+        pass
+
+    return m
+
+
 def collect_system_info() -> dict:
     """Gather all telemetry into a single dict."""
     return {
@@ -142,6 +228,7 @@ def collect_system_info() -> dict:
         "ip":       get_main_ip(),
         "kernel":   get_kernel_version(),
         "ports":    get_exposed_ports(),
+        "metrics":  get_metrics(),
     }
 
 
