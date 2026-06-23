@@ -137,7 +137,7 @@ def main():
                         content = r.read(65536)
                     fname = url.rstrip("/").split("/")[-1] or "index.html"
                     capture(s3, events, args.evidence_bucket, args.bus, args.region,
-                            fname, content, url, "MED")
+                            fname, content, url, "INFO")
                 except Exception as e:
                     print(f"  download failed: {e}", flush=True)
 

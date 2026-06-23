@@ -203,6 +203,7 @@ class MasterAPIHandler(BaseHTTPRequestHandler):
                 "registered_at":    now_iso(),
                 "last_heartbeat":   now_ts(),
                 "worker_version":   body.get("worker_version", "unknown"),
+                "metrics":          body.get("metrics", {}),
             }
             _db_upsert_node(nodes[node_id])
 
@@ -233,6 +234,7 @@ class MasterAPIHandler(BaseHTTPRequestHandler):
                 "ip":             body.get("ip", nodes[node_id]["ip"]),
                 "kernel":         body.get("kernel", nodes[node_id]["kernel"]),
                 "ports":          body.get("ports", nodes[node_id]["ports"]),
+                "metrics":        body.get("metrics", nodes[node_id].get("metrics", {})),
             })
             _db_upsert_node(nodes[node_id])
 
